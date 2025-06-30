@@ -1,0 +1,57 @@
+name: Build FFmpeg
+
+on:
+  push:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          git \
+          mingw-w64 \
+          yasm \
+          pkg-config \
+          gcc-12 \
+          g++-12 \
+          gcc-mingw-w64-x86-64 \
+          g++-mingw-w64-x86-64 \
+          nasm
+
+    - name: Set up GCC 12
+      run: |
+        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100
+        sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100
+        sudo update-alternatives --set x86_64-w64-mingw32-gcc /usr/bin/x86_64-w64-mingw32-gcc-posix
+        sudo update-alternatives --set x86_64-w64-mingw32-g++ /usr/bin/x86_64-w64-mingw32-g++-posix
+
+    - name: Configure and Build FFmpeg
+      run: |
+        ./configure \
+          --arch=x86_64 \
+          --target-os=mingw32 \
+          --cross-prefix=x86_64-w64-mingw32- \
+          --enable-static \
+          --disable-shared \
+          --disable-doc \
+          --enable-ffmpeg
+
+        # cross compile on ubuntu-latest requires https://git.ffmpeg.org/gitweb/ffmpeg.git/commitdiff/effadce
+        # see https://bbs.archlinux.org/viewtopic.php?id=289424
+
+        make -j$(nproc)
+        x86_64-w64-mingw32-strip ffmpeg.exe
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ffmpeg
+        path: |
+          ffmpeg.exe
